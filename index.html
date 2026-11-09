@@ -642,24 +642,36 @@
 
     <!-- ===================================================================
          [탭 2 - 공용] 🏥 병원 진료 · 정기 백신 · 구충 기록 관리
+         (기록자: 학생 이름 or 선생님 이름 작성 / 수정·삭제: 교사 마스터 전용)
          =================================================================== -->
     <section id="tabSection-medical" class="hidden space-y-6 fade-in">
-      <!-- 상단 안내 및 등록 폼 -->
       <div class="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
         <div class="bg-gradient-to-r from-purple-800 via-indigo-800 to-sky-800 px-6 py-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <span class="px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[11px] font-extrabold">수의보조 · 건강 이력 통합 관리</span>
+              <span class="px-2.5 py-0.5 rounded-full bg-amber-300 text-slate-950 text-[11px] font-extrabold">🔒 등록된 기록의 수정·삭제는 교사 전용</span>
             </div>
             <h2 class="text-lg sm:text-xl font-extrabold mt-1">🏥 병원 외래 진료 · 정기 백신 접종 · 구충 기록부</h2>
-            <p class="text-xs text-purple-100 mt-0.5">강아지가 병원에 다녀왔거나 정기 백신(종합·코로나·켄넬코프·광견병)·심장사상충·구충제를 투여했을 때 기록합니다.</p>
+            <p class="text-xs text-purple-100 mt-0.5">강아지가 병원에 다녀왔거나 정기 백신(종합·코로나·켄넬코프·광견병)·심장사상충·구충제를 투여했을 때 학생 또는 선생님이 기록합니다.</p>
           </div>
           <button onclick="exportMedicalLogsToCSV()" class="self-start sm:self-auto px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-extrabold shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0">
             <span>📥</span><span>병원·백신·구충 엑셀(CSV) 다운로드</span>
           </button>
         </div>
 
-        <form onsubmit="handleMedicalLogSubmit(event)" class="p-5 sm:p-6 space-y-4 bg-slate-50/50 border-b border-slate-200">
+        <!-- 수정 모드 알림 배너 (교사가 수정 버튼 클릭 시 표시) -->
+        <div id="medEditNoticeBanner" class="hidden bg-amber-50 border-b border-amber-300 px-6 py-3 flex items-center justify-between text-xs">
+          <div class="font-extrabold text-amber-950 flex items-center gap-2">
+            <span>✏️</span>
+            <span id="medEditNoticeText">선택한 병원·백신·구충 기록을 수정 중입니다.</span>
+          </div>
+          <button type="button" onclick="cancelMedicalEdit()" class="px-3 py-1 rounded-lg bg-white border border-amber-400 text-amber-900 font-extrabold cursor-pointer">수정 취소</button>
+        </div>
+
+        <form id="medicalLogForm" onsubmit="handleMedicalLogSubmit(event)" class="p-5 sm:p-6 space-y-4 bg-slate-50/50 border-b border-slate-200">
+          <input type="hidden" id="editingMedId" value="">
+
           <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
             <div class="sm:col-span-3">
               <label class="block text-xs font-extrabold text-slate-700 mb-1">📅 시행/진료 일자 *</label>
@@ -667,12 +679,12 @@
             </div>
             <div class="sm:col-span-4">
               <label class="block text-xs font-extrabold text-slate-700 mb-1">🐶 대상 실습견 선택 *</label>
-              <select id="medDogSelect" required class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-extrabold"></select>
+              <select id="medDogSelect" required onchange="updateMedWriterChips()" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-extrabold"></select>
             </div>
             <div class="sm:col-span-5">
               <label class="block text-xs font-extrabold text-slate-700 mb-1">🩺 기록 구분 (병원 / 백신 / 구충 / 처치) *</label>
               <select id="medTypeSelect" required class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-extrabold">
-                <option value="병원진료">🏥 외부 동물병원 진료 / 수술 / 검사</option>
+                <option value="병원진료">🏥 외부 동물병원 외래 진료 / 수술 / 검사</option>
                 <option value="백신접종">💉 정기 백신 접종 (종합·코로나·켄넬코프·광견병·신종플루)</option>
                 <option value="구충관리">💊 정기 구충 · 심장사상충 예방 (내부·외부 구충)</option>
                 <option value="교내처치">🩹 교내 수의보조 처치 / 상비약 투약</option>
@@ -695,7 +707,7 @@
           <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
             <div class="sm:col-span-5">
               <label class="block text-xs font-extrabold text-slate-700 mb-1">📋 진단명 / 백신·구충제명 (제목) *</label>
-              <input type="text" id="medTitleInput" required placeholder="예: 넥스가드 스펙트라 급여, 피부염 병원 진료 등" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold">
+              <input type="text" id="medTitleInput" required placeholder="예: 넥스가드 스펙트라 급여, 피부염 외래 진료 등" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-bold">
             </div>
             <div class="sm:col-span-4">
               <label class="block text-xs font-extrabold text-slate-700 mb-1">🏥 방문 병원명 또는 약품 용량 (선택)</label>
@@ -707,18 +719,27 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-            <div class="sm:col-span-7">
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+            <div class="sm:col-span-6">
               <label class="block text-xs font-extrabold text-slate-700 mb-1">📝 상세 진료 소견 · 처방약 · 후속 관리 주의사항</label>
-              <input type="text" id="medNotesInput" placeholder="예: 1주일간 내복약 아침/저녁 급여, 접종 후 당일 목욕 및 과격한 산책 금지 등" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-semibold">
+              <input type="text" id="medNotesInput" placeholder="예: 1주일간 내복약 아침/저녁 급여, 접종 후 당일 목욕 금지 등" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-semibold">
             </div>
-            <div class="sm:col-span-3">
-              <label class="block text-xs font-extrabold text-slate-700 mb-1">🧑‍🎓 기록자 이름 *</label>
-              <input type="text" id="medWriterInput" required placeholder="기록자 이름" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-extrabold">
+
+            <!-- 기록자 이름: 학생 이름 또는 선생님 이름 자유 입력 + 빠른 선택 칩 -->
+            <div class="sm:col-span-4">
+              <label class="block text-xs font-extrabold text-slate-700 mb-1">🧑‍🎓👨‍🏫 기록자 이름 (학생 또는 선생님 이름) *</label>
+              <input type="text" id="medWriterInput" required placeholder="학생 이름 또는 선생님 이름 입력" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs sm:text-sm font-extrabold">
+              <div id="medWriterQuickChips" class="flex flex-wrap items-center gap-1 mt-1.5">
+                <!-- JS로 해당 강아지 담당 학생 및 선생님 이름 빠른 선택 칩 렌더링 -->
+              </div>
             </div>
-            <div class="sm:col-span-2">
-              <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-extrabold text-xs sm:text-sm shadow-sm cursor-pointer">
-                ➕ 기록 추가
+
+            <div class="sm:col-span-2 flex flex-col gap-1.5 sm:pt-5">
+              <button type="submit" id="medSubmitBtn" class="w-full py-2.5 px-4 rounded-xl bg-purple-700 hover:bg-purple-800 text-white font-extrabold text-xs sm:text-sm shadow-sm cursor-pointer">
+                ➕ 기록 저장
+              </button>
+              <button type="button" id="medCancelEditBtn" onclick="cancelMedicalEdit()" class="hidden w-full py-1.5 px-3 rounded-xl border border-slate-300 bg-white text-slate-700 font-bold text-xs cursor-pointer">
+                취소
               </button>
             </div>
           </div>
@@ -738,7 +759,7 @@
               <option value="교내처치">🩹 교내처치만</option>
             </select>
           </div>
-          <span class="text-xs font-bold text-slate-500">총 <strong id="medTotalCountText" class="text-purple-700">0</strong>건의 의료·예방 기록</span>
+          <span class="text-xs font-bold text-slate-500">총 <strong id="medTotalCountText" class="text-purple-700">0</strong>건의 의료·예방 기록 (수정·삭제는 교사 모드 전용)</span>
         </div>
 
         <div class="overflow-x-auto">
@@ -751,8 +772,8 @@
                 <th class="py-3 px-4">진단명 / 백신·구충 항목 (병원·용량)</th>
                 <th class="py-3 px-4">상세 소견 및 주의사항</th>
                 <th class="py-3 px-4">다음 예정일</th>
-                <th class="py-3 px-4">기록자</th>
-                <th class="py-3 px-4 text-right">관리</th>
+                <th class="py-3 px-4">기록자 (학생/교사)</th>
+                <th class="py-3 px-4 text-right">교사 관리</th>
               </tr>
             </thead>
             <tbody id="medicalTableBody" class="divide-y divide-slate-200/80 text-xs sm:text-sm"></tbody>
@@ -850,7 +871,7 @@
         </div>
       </div>
 
-      <!-- 상단 5대 핵심 요약 카드 (대상견 / 아침 / 저녁 / 사료 / 주의) -->
+      <!-- 상단 5대 핵심 요약 카드 -->
       <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
           <div class="flex items-center justify-between">
@@ -919,7 +940,7 @@
         </div>
       </div>
 
-      <!-- 미작성자 실시간 추적 및 카카오톡 독촉 공지 복사 패널 (아침 / 저녁 / 사료 3분할) -->
+      <!-- 미작성자 실시간 추적 및 카카오톡 독촉 공지 복사 패널 -->
       <div class="bg-white rounded-2xl p-5 border-2 border-rose-200/90 shadow-xs">
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-rose-200/60">
           <div class="flex items-start gap-3">
@@ -1152,7 +1173,7 @@
     </div>
   </div>
 
-  <!-- 모달 2: 실습견 신규 추가 / 수정 모달 (훈련·미용 담당 및 입양완료 정보 포함) -->
+  <!-- 모달 2: 실습견 신규 추가 / 수정 모달 -->
   <div id="dogConfigModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 fade-in">
       <div class="bg-[#0062B1] px-6 py-4 text-white flex items-center justify-between">
@@ -1229,7 +1250,6 @@
           </div>
         </div>
 
-        <!-- 입양 관련 상세 기록란 (입양예정·입양완료 시 유용) -->
         <div class="p-3.5 rounded-2xl bg-purple-50 border border-purple-200 space-y-1.5">
           <label class="block text-xs font-extrabold text-purple-900">🏡 입양 관련 기록 (입양일자 · 입양자 · 연락처/메모 등 선택 입력)</label>
           <input type="text" id="configDogAdoptionNote" placeholder="예: 2026-11-15 홍길동님 가정 입양 완료 (중성화 및 백신 완료)" class="w-full px-3 py-2 rounded-xl border border-purple-300 bg-white text-xs font-bold">
@@ -1384,7 +1404,7 @@
       students: createDefault180Students(),
       logs: [],
       medicalLogs: [],
-      formPeriod: 'AM', // 'AM' | 'PM' | 'FEED'
+      formPeriod: 'AM',
       formFeedStatus: '완식',
       formFeces: '정상',
       formUrine: '정상',
@@ -1415,7 +1435,6 @@
       return `${Number(parts[0])}년 ${Number(parts[1])}월 ${Number(parts[2])}일 (${days[dt.getDay()]}요일)`;
     }
 
-    // 개체담당 학생 및 훈련·미용 담당 학생 표시 문자열
     function formatStudentsList(dog) {
       const careList = [dog.primaryStudent, dog.secondaryStudent].filter(Boolean).join(', ');
       if (dog.thirdStudent) {
@@ -1431,7 +1450,6 @@
       return period;
     }
 
-    // 일일 출석/미작성 집계에서 제외되는 개체인지 확인 (일시제외 또는 입양완료)
     function isDogExcludedFromDaily(dog) {
       return !!dog.excluded || dog.location === '입양완료';
     }
@@ -1491,7 +1509,6 @@
       if (!state.db) return;
       const db = state.db;
 
-      // 1. 실습견(dogs) 실시간 구독
       onSnapshot(collection(db, 'dogs'), async (snapshot) => {
         if (snapshot.empty) {
           for (const d of RAW_37_DOGS) {
@@ -1515,7 +1532,6 @@
         }
       });
 
-      // 2. 관리 일지(care_logs) 실시간 구독
       onSnapshot(collection(db, 'care_logs'), (snapshot) => {
         const loadedLogs = [];
         snapshot.forEach((docSnap) => loadedLogs.push(docSnap.data()));
@@ -1524,7 +1540,6 @@
         handleFormDogOrSlotChange();
       });
 
-      // 3. 병원·백신·구충 기록(medical_logs) 실시간 구독
       onSnapshot(collection(db, 'medical_logs'), (snapshot) => {
         const loadedMed = [];
         snapshot.forEach((docSnap) => loadedMed.push(docSnap.data()));
@@ -1532,7 +1547,6 @@
         renderMedicalTable();
       });
 
-      // 4. 180명 학생 계정 및 마스터 비밀번호 단일 문서(system/roster) 구독
       onSnapshot(doc(db, 'system', 'roster'), async (docSnap) => {
         if (!docSnap.exists()) {
           await saveRosterToCloud();
@@ -1636,7 +1650,7 @@
       if (rawId === 'teacher' || rawId === 'admin' || rawId === '교사') {
         if (rawPw === state.teacherPin) {
           state.isTeacher = true;
-          state.loggedInUser = { role: 'teacher', id: 'teacher', name: '담당 선생님' };
+          state.loggedInUser = { role: 'teacher', id: 'teacher', name: '' };
           if (remember) localStorage.setItem('kp_saved_session', JSON.stringify(state.loggedInUser));
           document.getElementById('loginGateOverlay').classList.add('hidden');
           refreshAllViews();
@@ -1943,7 +1957,6 @@
       document.getElementById('weightHintBtn').textContent = `기준 체중(${dog.baseWeight}kg) 자동입력`;
       document.getElementById('feedHintBtn').textContent = `권장 사료량(${dog.recommendedFeed}g) 자동입력`;
 
-      // 작성자 빠른 선택 칩 (내 이름 + 개체담당1·2 + 훈련·미용담당 구분)
       const chipsContainer = document.getElementById('writerQuickChips');
       let chipsHtml = '';
       if (state.loggedInUser && state.loggedInUser.name) {
@@ -2015,7 +2028,6 @@
         submitBtnText.textContent = `${getPeriodKorName(period)} 일지 저장 및 제출하기`;
       }
 
-      // 기본 작성자 이름 세팅: 로그인 학생 실명 우선 -> 사료(FEED) 타임이면 훈련·미용담당 우선 -> 개체담당1
       let defaultWriter = '';
       if (state.loggedInUser && state.loggedInUser.role === 'student' && state.loggedInUser.name) {
         defaultWriter = state.loggedInUser.name;
@@ -2029,7 +2041,6 @@
       document.getElementById('formFeedAmountInput').value = dog.recommendedFeed;
       selectFeedStatus('완식', false);
 
-      // 사료 급여 단독 기록('FEED')이거나 격리견이면 산책 생략 기본 체크
       const isIsolatedOrFeedOnly = dog.caution.includes('격리') || period === 'FEED';
       document.getElementById('formWalkSkippedCheck').checked = isIsolatedOrFeedOnly;
       document.getElementById('formWalkStart').value = period === 'AM' ? '08:10' : '17:10';
@@ -2256,6 +2267,7 @@
 
     // =========================================================================
     // [탭 2] 🏥 병원 진료 · 정기 백신 · 구충 기록 관리
+    // (학생 이름 or 선생님 이름 선택/직접입력 + 수정/삭제는 교사 전용)
     // =========================================================================
     function populateMedicalDogSelectors() {
       const selForm = document.getElementById('medDogSelect');
@@ -2271,11 +2283,48 @@
           state.dogs.map((d, i) => `<option value="${d.id}">${d.no || i + 1}. ${escapeHtml(d.name)}</option>`).join('');
         if (curF === 'ALL' || state.dogs.some(d => d.id === curF)) selFilter.value = curF;
       }
-      const medWriter = document.getElementById('medWriterInput');
-      if (medWriter && !medWriter.value && state.loggedInUser?.name) {
-        medWriter.value = state.loggedInUser.name;
-      }
+      updateMedWriterChips();
     }
+
+    // 선택한 강아지에 맞춰 기록자(학생 이름 or 선생님 이름) 빠른 선택 버튼 생성
+    window.updateMedWriterChips = function() {
+      const chipsEl = document.getElementById('medWriterQuickChips');
+      if (!chipsEl) return;
+      const dogId = document.getElementById('medDogSelect')?.value;
+      const dog = state.dogs.find(d => d.id === dogId) || state.dogs[0];
+      let html = '';
+
+      if (state.loggedInUser && state.loggedInUser.role === 'student' && state.loggedInUser.name) {
+        html += `<button type="button" onclick="setMedWriterName('${escapeHtml(state.loggedInUser.name)}')" class="px-2 py-0.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[11px] font-extrabold cursor-pointer">내이름: ${escapeHtml(state.loggedInUser.name)}</button>`;
+      }
+      if (dog) {
+        if (dog.primaryStudent) {
+          html += `<button type="button" onclick="setMedWriterName('${escapeHtml(dog.primaryStudent)}')" class="px-2 py-0.5 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-900 text-[11px] font-bold cursor-pointer">개체1: ${escapeHtml(dog.primaryStudent)}</button>`;
+        }
+        if (dog.secondaryStudent) {
+          html += `<button type="button" onclick="setMedWriterName('${escapeHtml(dog.secondaryStudent)}')" class="px-2 py-0.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 text-[11px] font-bold cursor-pointer">개체2: ${escapeHtml(dog.secondaryStudent)}</button>`;
+        }
+        if (dog.thirdStudent) {
+          html += `<button type="button" onclick="setMedWriterName('${escapeHtml(dog.thirdStudent)}')" class="px-2 py-0.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-900 text-[11px] font-bold cursor-pointer">훈련·미용: ${escapeHtml(dog.thirdStudent)}</button>`;
+        }
+      }
+      html += `<button type="button" onclick="setMedWriterName('담당 선생님')" class="px-2 py-0.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-[11px] font-bold cursor-pointer">👨‍🏫 담당 선생님</button>`;
+      chipsEl.innerHTML = html;
+
+      // 수정 모드가 아닐 때 학생으로 로그인한 경우에만 본인 실명을 기본값으로 세팅 (교사 로그인 시에는 빈칸 유지하여 학생/교사 이름 자유 입력 유도)
+      const writerInput = document.getElementById('medWriterInput');
+      const editingId = document.getElementById('editingMedId')?.value;
+      if (writerInput && !editingId && !writerInput.value) {
+        if (state.loggedInUser && state.loggedInUser.role === 'student' && state.loggedInUser.name) {
+          writerInput.value = state.loggedInUser.name;
+        }
+      }
+    };
+
+    window.setMedWriterName = function(name) {
+      const el = document.getElementById('medWriterInput');
+      if (el) el.value = name;
+    };
 
     window.setQuickMedTitle = function(typeVal, titleVal) {
       document.getElementById('medTypeSelect').value = typeVal;
@@ -2285,6 +2334,12 @@
 
     window.handleMedicalLogSubmit = async function(e) {
       e.preventDefault();
+      const editingId = document.getElementById('editingMedId').value;
+      if (editingId && !state.isTeacher) {
+        showToast('기존 병원·백신·구충 기록의 수정은 교사 마스터 모드에서만 가능합니다.', 'error');
+        return;
+      }
+
       const date = document.getElementById('medDateInput').value || TODAY_STR;
       const dogId = document.getElementById('medDogSelect').value;
       const type = document.getElementById('medTypeSelect').value;
@@ -2295,23 +2350,62 @@
       const writer = document.getElementById('medWriterInput').value.trim();
 
       if (!title || !writer) {
-        showToast('항목명과 기록자 이름을 입력해 주세요.', 'error');
+        showToast('진단/항목명과 기록자 이름(학생 또는 선생님)을 입력해 주세요.', 'error');
         return;
       }
 
       const medObj = {
-        id: `med_${Date.now()}`,
+        id: editingId || `med_${Date.now()}`,
         date, dogId, type, title, clinic, nextDate, notes, writer,
-        createdAt: new Date().toISOString()
+        updatedAt: new Date().toISOString()
       };
 
       await saveMedicalRecord(medObj);
+      cancelMedicalEdit();
+      const dog = state.dogs.find(d => d.id === dogId);
+      showToast(editingId
+        ? `${dog ? dog.name : ''} [${type}] 기록이 수정되었습니다!`
+        : `${dog ? dog.name : ''} [${type}] 기록이 등록되었습니다! (기록자: ${writer})`);
+    };
+
+    // 교사 전용: 병원·백신·구충 기록 수정 모드 진입
+    window.editMedicalRow = function(medId) {
+      if (!state.isTeacher) {
+        showToast('기록 수정은 교사 마스터 모드에서만 가능합니다.', 'error');
+        return;
+      }
+      const m = state.medicalLogs.find(item => item.id === medId);
+      if (!m) return;
+
+      document.getElementById('editingMedId').value = m.id;
+      document.getElementById('medDateInput').value = m.date || TODAY_STR;
+      document.getElementById('medDogSelect').value = m.dogId;
+      document.getElementById('medTypeSelect').value = m.type || '병원진료';
+      document.getElementById('medTitleInput').value = m.title || '';
+      document.getElementById('medClinicInput').value = m.clinic || '';
+      document.getElementById('medNextDateInput').value = m.nextDate || '';
+      document.getElementById('medNotesInput').value = m.notes || '';
+      document.getElementById('medWriterInput').value = m.writer || '';
+      updateMedWriterChips();
+
+      const dog = state.dogs.find(d => d.id === m.dogId);
+      document.getElementById('medEditNoticeText').textContent = `[${m.date} · ${dog ? dog.name : ''} · ${m.title}] 기록을 수정 중입니다.`;
+      document.getElementById('medEditNoticeBanner').classList.remove('hidden');
+      document.getElementById('medSubmitBtn').textContent = '✏️ 수정 저장';
+      document.getElementById('medCancelEditBtn').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    window.cancelMedicalEdit = function() {
+      document.getElementById('editingMedId').value = '';
       document.getElementById('medTitleInput').value = '';
       document.getElementById('medClinicInput').value = '';
       document.getElementById('medNextDateInput').value = '';
       document.getElementById('medNotesInput').value = '';
-      const dog = state.dogs.find(d => d.id === dogId);
-      showToast(`${dog ? dog.name : ''} [${type}] 기록이 등록되었습니다!`);
+      document.getElementById('medWriterInput').value = (state.loggedInUser && state.loggedInUser.role === 'student' && state.loggedInUser.name) ? state.loggedInUser.name : '';
+      document.getElementById('medEditNoticeBanner').classList.add('hidden');
+      document.getElementById('medSubmitBtn').textContent = '➕ 기록 저장';
+      document.getElementById('medCancelEditBtn').classList.add('hidden');
     };
 
     window.renderMedicalTable = function() {
@@ -2342,6 +2436,14 @@
         if (m.type === '구충관리') badgeClass = 'bg-emerald-100 text-emerald-900';
         if (m.type === '교내처치') badgeClass = 'bg-amber-100 text-amber-900';
 
+        // 교사 모드일 때만 [✏️ 수정] 및 [🗑️ 삭제] 버튼 노출
+        const actionHtml = state.isTeacher
+          ? `<div class="inline-flex items-center gap-1">
+               <button onclick="editMedicalRow('${m.id}')" class="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-extrabold cursor-pointer">✏️ 수정</button>
+               <button onclick="deleteMedicalRow('${m.id}')" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-extrabold cursor-pointer">🗑️ 삭제</button>
+             </div>`
+          : `<span class="text-[11px] font-bold text-slate-400">🔒 교사전용</span>`;
+
         return `
           <tr class="hover:bg-slate-50">
             <td class="py-3 px-4 font-bold whitespace-nowrap">${escapeHtml(m.date)}</td>
@@ -2350,16 +2452,18 @@
             <td class="py-3 px-4 font-bold">${escapeHtml(m.title)}${m.clinic ? ` <span class="text-xs text-slate-500">(${escapeHtml(m.clinic)})</span>` : ''}</td>
             <td class="py-3 px-4 text-xs">${escapeHtml(m.notes || '-')}</td>
             <td class="py-3 px-4 font-extrabold text-purple-700 whitespace-nowrap">${escapeHtml(m.nextDate || '-')}</td>
-            <td class="py-3 px-4 font-bold whitespace-nowrap">${escapeHtml(m.writer)}</td>
-            <td class="py-3 px-4 text-right whitespace-nowrap">
-              <button onclick="deleteMedicalRow('${m.id}')" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-bold cursor-pointer">삭제</button>
-            </td>
+            <td class="py-3 px-4 font-extrabold whitespace-nowrap">${escapeHtml(m.writer)}</td>
+            <td class="py-3 px-4 text-right whitespace-nowrap">${actionHtml}</td>
           </tr>
         `;
       }).join('');
     };
 
     window.deleteMedicalRow = async function(medId) {
+      if (!state.isTeacher) {
+        showToast('기록 삭제는 교사 마스터 모드에서만 가능합니다.', 'error');
+        return;
+      }
       if (!confirm('이 병원·백신·구충 기록을 삭제하시겠습니까?')) return;
       await removeMedicalRecord(medId);
       showToast('의료 기록이 삭제되었습니다.');
@@ -2380,769 +2484,3 @@
       const link = document.createElement('a');
       link.href = url;
       link.download = `한국펫고_병원백신구충기록_${TODAY_STR}.csv`;
-      link.click();
-      URL.revokeObjectURL(url);
-      showToast('병원·백신·구충 엑셀(CSV) 파일이 다운로드되었습니다.');
-    };
-
-    // =========================================================================
-    // [탭 4 - 교사 전용] 📊 교사 모니터링 (아침 / 저녁 / 사료 3분할)
-    // =========================================================================
-    window.handleMonitorDateChange = function(val) { if (val) { state.monitorDate = val; renderMonitorDashboard(); } };
-    window.shiftMonitorDate = function(days) {
-      const parts = state.monitorDate.split('-').map(Number);
-      const dt = new Date(parts[0], parts[1] - 1, parts[2]);
-      dt.setDate(dt.getDate() + days);
-      state.monitorDate = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-      renderMonitorDashboard();
-    };
-    window.setMonitorDateToday = function() { state.monitorDate = TODAY_STR; renderMonitorDashboard(); };
-
-    window.setMonitorFilter = function(filterType) {
-      state.monitorFilter = filterType;
-      ['all', 'missing', 'done', 'alert'].forEach((f) => {
-        const btn = document.getElementById(`filterBtn-${f}`);
-        if (!btn) return;
-        if (f === filterType) btn.className = 'px-2.5 py-1.5 rounded-lg bg-white text-slate-900 shadow-2xs transition-all cursor-pointer';
-        else btn.className = 'px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all cursor-pointer';
-      });
-      renderMonitorDashboard();
-    };
-
-    function populateLocationFilterDropdown() {
-      const sel = document.getElementById('locationFilterSelect');
-      if (!sel) return;
-      const currentVal = sel.value || 'ALL';
-      const locations = ['훈련', '미용', '입양모집', '입양예정', '입양완료'];
-      let html = `<option value="ALL">모든 구분 (${state.dogs.length}두)</option>`;
-      locations.forEach((loc) => {
-        const count = state.dogs.filter((d) => d.location === loc).length;
-        html += `<option value="${escapeHtml(loc)}">${escapeHtml(loc)} (${count}두)</option>`;
-      });
-      sel.innerHTML = html;
-      if (locations.includes(currentVal)) sel.value = currentVal;
-    }
-
-    window.renderMonitorDashboard = function() {
-      const dateStr = state.monitorDate;
-      const dateInput = document.getElementById('monitorDateInput');
-      if (dateInput) dateInput.value = dateStr;
-      const korLabel = document.getElementById('monitorDateKorLabel');
-      if (korLabel) korLabel.textContent = formatKoreanDateLabel(dateStr);
-
-      // 입양완료 및 일시제외를 뺀 재원 출석 대상 실습견
-      const activeDogs = state.dogs.filter((d) => !isDogExcludedFromDaily(d));
-      const excludedCount = state.dogs.length - activeDogs.length;
-      const totalDogs = activeDogs.length;
-      const dayLogs = state.logs.filter((l) => l.date === dateStr);
-
-      let amDone = 0, pmDone = 0, feedDone = 0, alertCount = 0;
-      const missingAmList = [], missingPmList = [], missingFeedList = [];
-
-      activeDogs.forEach((dog) => {
-        const amLog = dayLogs.find((l) => l.dogId === dog.id && l.period === 'AM');
-        const pmLog = dayLogs.find((l) => l.dogId === dog.id && l.period === 'PM');
-        const feedLog = dayLogs.find((l) => l.dogId === dog.id && l.period === 'FEED');
-
-        if (amLog) { amDone++; if (isLogAbnormal(amLog)) alertCount++; } else missingAmList.push(dog);
-        if (pmLog) { pmDone++; if (isLogAbnormal(pmLog)) alertCount++; } else missingPmList.push(dog);
-        if (feedLog) { feedDone++; if (isLogAbnormal(feedLog)) alertCount++; } else missingFeedList.push(dog);
-      });
-
-      const amMissing = totalDogs - amDone;
-      const pmMissing = totalDogs - pmDone;
-      const feedMissing = totalDogs - feedDone;
-      const totalMissing = amMissing + pmMissing + feedMissing;
-
-      const amPct = totalDogs > 0 ? Math.round((amDone / totalDogs) * 100) : 0;
-      const pmPct = totalDogs > 0 ? Math.round((pmDone / totalDogs) * 100) : 0;
-      const feedPct = totalDogs > 0 ? Math.round((feedDone / totalDogs) * 100) : 0;
-
-      document.getElementById('statTotalDogs').textContent = totalDogs;
-      document.getElementById('statExcludedSubtext').textContent = excludedCount > 0 ? `입양완료·제외 ${excludedCount}두 분리됨` : `전체 ${state.dogs.length}두 재원 중`;
-
-      document.getElementById('statAmDone').textContent = amDone;
-      document.getElementById('statAmTotal').textContent = totalDogs;
-      document.getElementById('statAmBadge').textContent = `${amPct}%`;
-      document.getElementById('statAmMissingText').textContent = amMissing > 0 ? `미작성 ${amMissing}` : '완료!';
-      document.getElementById('statAmBar').style.width = `${amPct}%`;
-
-      document.getElementById('statPmDone').textContent = pmDone;
-      document.getElementById('statPmTotal').textContent = totalDogs;
-      document.getElementById('statPmBadge').textContent = `${pmPct}%`;
-      document.getElementById('statPmMissingText').textContent = pmMissing > 0 ? `미작성 ${pmMissing}` : '완료!';
-      document.getElementById('statPmBar').style.width = `${pmPct}%`;
-
-      document.getElementById('statFeedDone').textContent = feedDone;
-      document.getElementById('statFeedTotal').textContent = totalDogs;
-      document.getElementById('statFeedBadge').textContent = `${feedPct}%`;
-      document.getElementById('statFeedMissingText').textContent = feedMissing > 0 ? `미기록 ${feedMissing}` : '완료!';
-      document.getElementById('statFeedBar').style.width = `${feedPct}%`;
-
-      document.getElementById('statAlertCount').textContent = alertCount;
-      document.getElementById('navMissingCountBadge').textContent = totalMissing;
-
-      const summaryPill = document.getElementById('missingSummaryPill');
-      if (totalMissing === 0) {
-        summaryPill.textContent = '🎉 아침·저녁·사료 전 개체 기록 완료!';
-      } else {
-        summaryPill.textContent = `아침 미작성 ${amMissing} · 저녁 미작성 ${pmMissing} · 사료 미기록 ${feedMissing}`;
-      }
-
-      document.getElementById('missingAmBadgesContainer').innerHTML = missingAmList.length === 0
-        ? `<span class="text-xs font-bold text-emerald-600 py-1">✅ 아침 관리 전원 완료!</span>`
-        : missingAmList.map((dog) => `<button onclick="jumpToWriteLog('${dateStr}', 'AM', '${dog.id}')" class="px-2 py-1 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-900 hover:text-white border border-rose-200 text-[11px] font-bold transition-all cursor-pointer">${dog.emoji || '🐶'} <strong>${escapeHtml(dog.name)}</strong> (${escapeHtml(dog.primaryStudent || '')})</button>`).join('');
-
-      document.getElementById('missingPmBadgesContainer').innerHTML = missingPmList.length === 0
-        ? `<span class="text-xs font-bold text-emerald-600 py-1">✅ 저녁 관리 전원 완료!</span>`
-        : missingPmList.map((dog) => `<button onclick="jumpToWriteLog('${dateStr}', 'PM', '${dog.id}')" class="px-2 py-1 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-900 hover:text-white border border-rose-200 text-[11px] font-bold transition-all cursor-pointer">${dog.emoji || '🐶'} <strong>${escapeHtml(dog.name)}</strong> (${escapeHtml(dog.primaryStudent || '')})</button>`).join('');
-
-      document.getElementById('missingFeedBadgesContainer').innerHTML = missingFeedList.length === 0
-        ? `<span class="text-xs font-bold text-emerald-600 py-1">✅ 사료 급여 전원 완료!</span>`
-        : missingFeedList.map((dog) => `<button onclick="jumpToWriteLog('${dateStr}', 'FEED', '${dog.id}')" class="px-2 py-1 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-900 hover:text-white border border-rose-200 text-[11px] font-bold transition-all cursor-pointer">${dog.emoji || '🐶'} <strong>${escapeHtml(dog.name)}</strong> (${escapeHtml(dog.thirdStudent || dog.primaryStudent || '')})</button>`).join('');
-
-      const locFilter = document.getElementById('locationFilterSelect')?.value || 'ALL';
-      const searchQ = (document.getElementById('monitorSearchInput')?.value || '').trim().toLowerCase();
-      const filteredDogs = state.dogs.filter((dog) => {
-        if (locFilter === 'ALL' && dog.location === '입양완료' && !searchQ) return false;
-        if (locFilter !== 'ALL' && dog.location !== locFilter) return false;
-        if (searchQ) {
-          const hay = `${dog.no || ''} ${dog.name} ${dog.breed || ''} ${dog.location} ${formatStudentsList(dog)}`.toLowerCase();
-          if (!hay.includes(searchQ)) return false;
-        }
-        const amLog = dayLogs.find((l) => l.dogId === dog.id && l.period === 'AM');
-        const pmLog = dayLogs.find((l) => l.dogId === dog.id && l.period === 'PM');
-        const feedLog = dayLogs.find((l) => l.dogId === dog.id && l.period === 'FEED');
-        if (state.monitorFilter === 'missing') return !isDogExcludedFromDaily(dog) && (!amLog || !pmLog || !feedLog);
-        if (state.monitorFilter === 'done') return !!(amLog || pmLog || feedLog);
-        if (state.monitorFilter === 'alert') return isLogAbnormal(amLog) || isLogAbnormal(pmLog) || isLogAbnormal(feedLog);
-        return true;
-      });
-
-      const tbody = document.getElementById('monitorTableBody');
-      if (filteredDogs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="py-10 text-center text-slate-400 font-bold text-sm">조건에 해당하는 실습견이 없습니다.</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = filteredDogs.map((dog, idx) => {
-        const amLog = dayLogs.find((l) => l.dogId === dog.id && l.period === 'AM');
-        const pmLog = dayLogs.find((l) => l.dogId === dog.id && l.period === 'PM');
-        const feedLog = dayLogs.find((l) => l.dogId === dog.id && l.period === 'FEED');
-        return `
-          <tr class="hover:bg-slate-50/90 transition-colors ${isDogExcludedFromDaily(dog) ? 'opacity-60' : ''}">
-            <td class="py-3.5 px-4 align-top">
-              <div class="flex items-start gap-2.5">
-                <div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-lg shrink-0">${dog.emoji || '🐶'}</div>
-                <div>
-                  <div class="flex items-center gap-1.5 flex-wrap">
-                    <span class="text-xs font-extrabold text-slate-400">#${dog.no || idx + 1}</span>
-                    <span class="font-extrabold text-slate-900 text-base">${escapeHtml(dog.name)}</span>
-                    <span class="px-2 py-0.5 rounded-md border border-slate-200 font-bold text-[11px]">${escapeHtml(dog.location)}</span>
-                  </div>
-                  <p class="text-xs font-semibold text-slate-500 mt-0.5">${escapeHtml(dog.breed || '')}</p>
-                </div>
-              </div>
-            </td>
-            <td class="py-3.5 px-4 align-top text-xs">
-              <div class="font-extrabold text-slate-800">개체: ${escapeHtml([dog.primaryStudent, dog.secondaryStudent].filter(Boolean).join(', '))}</div>
-              ${dog.thirdStudent ? `<div class="font-extrabold text-purple-700 mt-0.5">훈련·미용: ${escapeHtml(dog.thirdStudent)}</div>` : ''}
-              <div class="text-[11px] text-slate-400 mt-0.5">기준 ${dog.baseWeight}kg · 사료 ${dog.recommendedFeed}g</div>
-            </td>
-            <td class="py-3.5 px-4 align-top">${renderSlotCellHtml(dateStr, 'AM', dog, amLog)}</td>
-            <td class="py-3.5 px-4 align-top">${renderSlotCellHtml(dateStr, 'PM', dog, pmLog)}</td>
-            <td class="py-3.5 px-4 align-top">${renderSlotCellHtml(dateStr, 'FEED', dog, feedLog)}</td>
-            <td class="py-3.5 px-4 align-top">${renderHealthSummaryCellHtml(amLog, pmLog, feedLog, dog)}</td>
-          </tr>
-        `;
-      }).join('');
-    };
-
-    function renderSlotCellHtml(dateStr, period, dog, log) {
-      if (isDogExcludedFromDaily(dog) && !log) {
-        return `<div class="p-2.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-500 text-center">${dog.location === '입양완료' ? '🏡 입양완료' : '⏸️ 제외됨'}</div>`;
-      }
-      if (!log) {
-        const targetStu = period === 'FEED' && dog.thirdStudent ? dog.thirdStudent : dog.primaryStudent;
-        return `
-          <button onclick="jumpToWriteLog('${dateStr}', '${period}', '${dog.id}')" class="w-full p-2.5 rounded-xl border-2 border-dashed border-rose-200 bg-rose-50/50 text-left transition-all cursor-pointer">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-extrabold text-rose-600">❌ 미작성</span>
-              <span class="text-[10px] font-bold text-rose-500">입력 ▶</span>
-            </div>
-            <div class="text-[11px] text-slate-500 mt-0.5 truncate">담당: ${escapeHtml(targetStu || '-')}</div>
-          </button>
-        `;
-      }
-      const walkText = log.walkSkipped ? '산책생략' : `${log.walkMinutes}분`;
-      return `
-        <div onclick="openLogDetailModal('${log.id}')" class="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/50 transition-all cursor-pointer">
-          <div class="flex items-center justify-between gap-1">
-            <span class="text-xs font-extrabold text-emerald-800">✅ ${escapeHtml(log.writer)}</span>
-            <span class="text-[10px] font-bold text-emerald-600">${escapeHtml(log.submittedAt)}</span>
-          </div>
-          <div class="text-[11px] font-semibold text-slate-700 mt-1">${log.feedAmount}g(${escapeHtml(log.feedStatus)}) · ${walkText}</div>
-        </div>
-      `;
-    }
-
-    function renderHealthSummaryCellHtml(amLog, pmLog, feedLog, dog) {
-      if (!amLog && !pmLog && !feedLog) return `<span class="text-xs text-slate-400 font-medium">${escapeHtml(dog.caution)}</span>`;
-      const items = [];
-      [amLog, pmLog, feedLog].forEach((l) => {
-        if (!l) return;
-        const pLabel = l.period === 'AM' ? '아침' : (l.period === 'PM' ? '저녁' : '사료');
-        items.push(`<div class="text-xs"><span class="font-extrabold">[${pLabel}]</span> 대변: ${escapeHtml(formatFecesDisplay(l))} / 소변: ${escapeHtml(formatUrineDisplay(l))}</div>`);
-        if (l.notes) items.push(`<div class="text-[11px] text-sky-900 bg-sky-50 px-2 py-1 rounded-lg border border-sky-100 mt-0.5">💬 [${pLabel} ${escapeHtml(l.writer)}] ${escapeHtml(l.notes)}</div>`);
-      });
-      return `<div class="space-y-1 max-w-xs">${items.join('')}</div>`;
-    }
-
-    window.jumpToWriteLog = function(dateStr, period, dogId) {
-      document.getElementById('formDateInput').value = dateStr;
-      document.getElementById('formDogSelect').value = dogId;
-      selectFormPeriod(period);
-      switchMainTab('write');
-    };
-
-    function copyTextToClipboard(text, successMsg) {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.left = '-9999px';
-      document.body.appendChild(ta);
-      ta.select();
-      try { document.execCommand('copy'); showToast(successMsg); } 
-      catch (e) { showToast('복사에 실패했습니다.', 'error'); } 
-      finally { document.body.removeChild(ta); }
-    }
-
-    window.copyKakaoMissingNotice = function(mode = 'all') {
-      const dateStr = state.monitorDate;
-      const dayLogs = state.logs.filter((l) => l.date === dateStr);
-      const missingAm = [], missingPm = [], missingFeed = [];
-
-      state.dogs.filter(d => !isDogExcludedFromDaily(d)).forEach((dog) => {
-        const amLog = dayLogs.find((l) => l.dogId === dog.id && l.period === 'AM');
-        const pmLog = dayLogs.find((l) => l.dogId === dog.id && l.period === 'PM');
-        const feedLog = dayLogs.find((l) => l.dogId === dog.id && l.period === 'FEED');
-        const careStr = [dog.primaryStudent, dog.secondaryStudent].filter(Boolean).join(', ');
-        const feedStr = dog.thirdStudent ? `훈련·미용:${dog.thirdStudent} / 개체:${careStr}` : careStr;
-
-        if (!amLog) missingAm.push(`• [${dog.location}] ${dog.name} (${careStr})`);
-        if (!pmLog) missingPm.push(`• [${dog.location}] ${dog.name} (${careStr})`);
-        if (!feedLog) missingFeed.push(`• [${dog.location}] ${dog.name} (${feedStr})`);
-      });
-
-      let lines = [`[🐶 한국펫고 실습견 관리일지 미작성 안내 (${dateStr})]`, ''];
-      if (mode === 'all' || mode === 'am') {
-        lines.push(`☀️ [아침 관리 미작성 — ${missingAm.length}두]`);
-        lines.push(missingAm.length ? missingAm.join('\n') : '• 전원 작성 완료!');
-        lines.push('');
-      }
-      if (mode === 'all' || mode === 'pm') {
-        lines.push(`🌙 [저녁 관리 미작성 — ${missingPm.length}두]`);
-        lines.push(missingPm.length ? missingPm.join('\n') : '• 전원 작성 완료!');
-        lines.push('');
-      }
-      if (mode === 'all' || mode === 'feed') {
-        lines.push(`🥣 [사료 급여 미기록 — ${missingFeed.length}두]`);
-        lines.push(missingFeed.length ? missingFeed.join('\n') : '• 전원 기록 완료!');
-        lines.push('');
-      }
-      lines.push('개체관리 담당 및 훈련·미용 사료 급여 담당 학생들은 즉시 일지를 작성해 주세요!');
-      copyTextToClipboard(lines.join('\n'), '카카오톡 미작성자 안내 문구가 복사되었습니다!');
-    };
-
-    window.copyKakaoDailyReport = function() {
-      const dateStr = state.monitorDate;
-      const dayLogs = state.logs.filter((l) => l.date === dateStr);
-      const alertLines = [];
-      dayLogs.forEach((l) => {
-        const dog = state.dogs.find((d) => d.id === l.dogId);
-        if (!dog) return;
-        if (isLogAbnormal(l) || (l.notes && l.notes.trim() !== '')) {
-          const pKor = getPeriodKorName(l.period);
-          alertLines.push(`• ${dog.name}(${pKor}/${l.writer}): 사료[${l.feedAmount}g/${l.feedStatus}], 대변[${formatFecesDisplay(l)}], 소변[${formatUrineDisplay(l)}] ${l.notes ? '/ 메모: ' + l.notes : ''}`);
-        }
-      });
-      const report = [
-        `[🩺 한국펫고 실습견 일일 건강·특이사항 요약 (${dateStr})]`,
-        `• 총 기록 건수: ${dayLogs.length}건`,
-        '',
-        '[주요 특이사항 및 기타 보고 내역]',
-        alertLines.length ? alertLines.join('\n') : '• 특이 이상징후 없이 전 개체 양호합니다.'
-      ].join('\n');
-      copyTextToClipboard(report, '오늘 건강·특이사항 요약 리포트가 복사되었습니다!');
-    };
-
-    // =========================================================================
-    // [탭 5 - 교사 전용] 🐶 실습견 개체 관리 및 🏡 입양완료 관리
-    // =========================================================================
-    window.renderSettingsDogsGrid = function() {
-      const grid = document.getElementById('settingsDogCardsGrid');
-      if (!grid) return;
-      const searchQ = (document.getElementById('settingsSearchInput')?.value || '').trim().toLowerCase();
-      const catFilter = document.getElementById('settingsCatFilter')?.value || 'ALL';
-
-      const filtered = state.dogs.filter((dog) => {
-        if (catFilter === 'EXCLUDED') return !!dog.excluded;
-        if (catFilter !== 'ALL' && dog.location !== catFilter) return false;
-        if (searchQ) {
-          const hay = `${dog.no || ''} ${dog.name} ${dog.breed || ''} ${dog.location} ${formatStudentsList(dog)} ${dog.adoptionNote || ''}`.toLowerCase();
-          if (!hay.includes(searchQ)) return false;
-        }
-        return true;
-      });
-
-      grid.innerHTML = filtered.map((dog, idx) => `
-        <div class="bg-white rounded-2xl p-5 border ${dog.location === '입양완료' ? 'border-purple-300 bg-purple-50/20' : 'border-slate-200/90'} shadow-2xs flex flex-col justify-between gap-4">
-          <div>
-            <div class="flex items-start justify-between gap-2">
-              <div class="flex items-center gap-3">
-                <div class="w-11 h-11 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-2xl shrink-0">${dog.emoji || '🐶'}</div>
-                <div>
-                  <div class="flex items-center gap-1.5 flex-wrap">
-                    <span class="text-xs font-extrabold text-slate-400">#${dog.no || idx + 1}</span>
-                    <h3 class="text-base font-extrabold text-slate-900">${escapeHtml(dog.name)}</h3>
-                    <span class="px-2 py-0.5 rounded-md ${dog.location === '입양완료' ? 'bg-purple-200 text-purple-900' : 'bg-slate-100 text-slate-700'} font-extrabold text-[11px]">${escapeHtml(dog.location)}</span>
-                  </div>
-                  <p class="text-xs font-semibold text-slate-500 mt-0.5">${escapeHtml(dog.breed || '')}</p>
-                </div>
-              </div>
-              <div class="text-right text-xs font-bold text-slate-500 shrink-0">
-                <div>기준 ${dog.baseWeight}kg</div>
-                <div class="text-sky-700">사료 ${dog.recommendedFeed}g</div>
-              </div>
-            </div>
-            <div class="mt-3.5 p-3 rounded-xl bg-slate-50 border border-slate-200/70 space-y-1 text-xs">
-              <div class="flex items-center justify-between">
-                <span class="text-slate-400 font-bold">개체관리 학생:</span>
-                <span class="font-extrabold text-slate-900">${escapeHtml([dog.primaryStudent, dog.secondaryStudent].filter(Boolean).join(', ') || '-')}</span>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-purple-700 font-bold">훈련·미용 담당:</span>
-                <span class="font-extrabold text-purple-900">${escapeHtml(dog.thirdStudent || '미지정')}</span>
-              </div>
-            </div>
-            ${dog.adoptionNote ? `<div class="mt-2 p-2.5 rounded-xl bg-purple-50 border border-purple-200 text-xs font-bold text-purple-900">🏡 ${escapeHtml(dog.adoptionNote)}</div>` : ''}
-            <div class="mt-2.5 p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 text-xs">
-              <p class="text-amber-950 font-medium leading-relaxed line-clamp-2">${escapeHtml(dog.caution)}</p>
-            </div>
-          </div>
-          <div class="flex flex-wrap items-center justify-between gap-1.5 pt-3 border-t border-slate-100">
-            <button onclick="toggleDogExcluded('${dog.id}')" class="px-2.5 py-1.5 rounded-xl border border-slate-300 text-[11px] font-extrabold cursor-pointer">
-              ${dog.excluded ? '▶️ 출석 복귀' : '⏸️ 일시 제외'}
-            </button>
-            <div class="flex items-center gap-1.5">
-              <button onclick="openDogModal('${dog.id}')" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold cursor-pointer">✏️ 배정·정보 수정</button>
-              <button onclick="openDeleteDogConfirmModal('${dog.id}')" class="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-600 text-xs font-extrabold cursor-pointer">🗑️ 삭제/입양</button>
-            </div>
-          </div>
-        </div>
-      `).join('');
-    };
-
-    window.toggleDogExcluded = async function(dogId) {
-      if (!state.isTeacher) return;
-      const dog = state.dogs.find((d) => d.id === dogId);
-      if (!dog) return;
-      dog.excluded = !dog.excluded;
-      await saveDogRecord(dog);
-      showToast(dog.excluded ? `${dog.name} 개체가 출석에서 제외되었습니다.` : `${dog.name} 개체가 복귀되었습니다.`);
-    };
-
-    window.handleConfigLocationChange = function() {
-      const loc = document.getElementById('configDogLocation').value;
-      if (loc === '입양완료') {
-        document.getElementById('configDogExcluded').checked = true;
-      }
-    };
-
-    window.openDogModal = function(dogId = '') {
-      if (!state.isTeacher) return;
-      const modal = document.getElementById('dogConfigModal');
-      if (dogId) {
-        const dog = state.dogs.find((d) => d.id === dogId);
-        if (!dog) return;
-        document.getElementById('configDogId').value = dog.id;
-        document.getElementById('configDogNo').value = dog.no || 1;
-        document.getElementById('configDogName').value = dog.name;
-        document.getElementById('configDogBreed').value = dog.breed || '';
-        document.getElementById('configDogEmoji').value = dog.emoji || '🐶';
-        document.getElementById('configDogLocation').value = dog.location || '훈련';
-        document.getElementById('configDogWeight').value = dog.baseWeight;
-        document.getElementById('configDogFeed').value = dog.recommendedFeed;
-        document.getElementById('configDogPrimaryStudent').value = dog.primaryStudent || '';
-        document.getElementById('configDogSecondaryStudent').value = dog.secondaryStudent || '';
-        document.getElementById('configDogThirdStudent').value = dog.thirdStudent || '';
-        document.getElementById('configDogAdoptionNote').value = dog.adoptionNote || '';
-        document.getElementById('configDogCaution').value = dog.caution || '';
-        document.getElementById('configDogExcluded').checked = !!dog.excluded || dog.location === '입양완료';
-      } else {
-        document.getElementById('configDogId').value = '';
-        const maxNo = state.dogs.reduce((acc, d) => Math.max(acc, d.no || 0), 0);
-        document.getElementById('configDogNo').value = maxNo + 1;
-        document.getElementById('configDogName').value = '';
-        document.getElementById('configDogBreed').value = '';
-        document.getElementById('configDogEmoji').value = '🐕';
-        document.getElementById('configDogLocation').value = '훈련';
-        document.getElementById('configDogWeight').value = 10.0;
-        document.getElementById('configDogFeed').value = 100;
-        document.getElementById('configDogPrimaryStudent').value = '';
-        document.getElementById('configDogSecondaryStudent').value = '';
-        document.getElementById('configDogThirdStudent').value = '';
-        document.getElementById('configDogAdoptionNote').value = '';
-        document.getElementById('configDogCaution').value = '산책 후 물 급여 및 눈곱·입·발·생식기 기본 타월링';
-        document.getElementById('configDogExcluded').checked = false;
-      }
-      modal.classList.remove('hidden');
-    };
-
-    window.closeDogModal = function() { document.getElementById('dogConfigModal').classList.add('hidden'); };
-
-    window.handleDogConfigSubmit = async function(e) {
-      e.preventDefault();
-      if (!state.isTeacher) return;
-      const existingId = document.getElementById('configDogId').value;
-      const loc = document.getElementById('configDogLocation').value.trim();
-      const dogObj = {
-        id: existingId || `dog-${Date.now()}`,
-        no: parseInt(document.getElementById('configDogNo').value, 10) || (state.dogs.length + 1),
-        name: document.getElementById('configDogName').value.trim(),
-        breed: document.getElementById('configDogBreed').value.trim(),
-        emoji: document.getElementById('configDogEmoji').value,
-        location: loc,
-        baseWeight: parseFloat(document.getElementById('configDogWeight').value) || 5.0,
-        recommendedFeed: parseInt(document.getElementById('configDogFeed').value, 10) || 100,
-        primaryStudent: document.getElementById('configDogPrimaryStudent').value.trim(),
-        secondaryStudent: document.getElementById('configDogSecondaryStudent').value.trim(),
-        thirdStudent: document.getElementById('configDogThirdStudent').value.trim(),
-        adoptionNote: document.getElementById('configDogAdoptionNote').value.trim(),
-        caution: document.getElementById('configDogCaution').value.trim(),
-        excluded: document.getElementById('configDogExcluded').checked || loc === '입양완료'
-      };
-      await saveDogRecord(dogObj);
-      closeDogModal();
-      showToast(`${dogObj.name} 실습견 정보가 저장되었습니다!`);
-    };
-
-    window.openDeleteDogConfirmModal = function(dogId) {
-      if (!state.isTeacher) return;
-      const dog = state.dogs.find((d) => d.id === dogId);
-      if (!dog) return;
-      document.getElementById('deleteConfirmDogTitle').textContent = `[#${dog.no || ''} ${dog.name}] 개체를 어떻게 처리하시겠습니까?`;
-      document.getElementById('deleteDogConfirmModal').classList.remove('hidden');
-
-      document.getElementById('markAdoptedInsteadOfDeleteBtn').onclick = async () => {
-        dog.location = '입양완료';
-        dog.emoji = '🏡';
-        dog.excluded = true;
-        if (!dog.adoptionNote) dog.adoptionNote = `${TODAY_STR} 입양 완료`;
-        await saveDogRecord(dog);
-        closeDeleteDogConfirmModal();
-        showToast(`${dog.name} 개체가 [🏡 입양완료] 상태로 보존 처리되었습니다.`);
-      };
-
-      document.getElementById('pauseInsteadOfDeleteBtn').onclick = async () => {
-        dog.excluded = true;
-        await saveDogRecord(dog);
-        closeDeleteDogConfirmModal();
-        showToast(`${dog.name} 개체가 [일시 제외]로 전환되었습니다.`);
-      };
-
-      document.getElementById('confirmHardDeleteDogBtn').onclick = async () => {
-        const deletedName = dog.name;
-        await removeDogRecord(dogId);
-        closeDeleteDogConfirmModal();
-        showToast(`${deletedName} 개체가 삭제되었습니다.`);
-      };
-    };
-
-    window.closeDeleteDogConfirmModal = function() { document.getElementById('deleteDogConfirmModal').classList.add('hidden'); };
-    window.openResetConfirmModal = function() { document.getElementById('resetConfirmModal').classList.remove('hidden'); };
-    window.closeResetConfirmModal = function() { document.getElementById('resetConfirmModal').classList.add('hidden'); };
-
-    window.confirmResetToSchool37Dogs = async function() {
-      closeResetConfirmModal();
-      state.dogs = JSON.parse(JSON.stringify(RAW_37_DOGS));
-      refreshAllViews();
-      if (state.useFirebase && state.db) {
-        for (const d of RAW_37_DOGS) await setDoc(doc(state.db, 'dogs', d.id), d);
-      }
-      showToast('학교 표준 37두 명단이 복원되었습니다!');
-    };
-
-    // =========================================================================
-    // [탭 6 - 교사 전용] 🧑‍🎓 학생 180명 계정 관리 및 새 학년 진급
-    // =========================================================================
-    window.renderStudentAccountsTable = function() {
-      const tbody = document.getElementById('studentAccountsTableBody');
-      if (!tbody) return;
-
-      const gFilter = document.getElementById('stuFilterGrade')?.value || 'ALL';
-      const cFilter = document.getElementById('stuFilterClass')?.value || 'ALL';
-      const searchQ = (document.getElementById('stuSearchInput')?.value || '').trim().toLowerCase();
-
-      const namedCount = state.students.filter(s => s.name && s.name.trim() !== '').length;
-      const totalEl = document.getElementById('stuTotalCountText');
-      const namedEl = document.getElementById('stuNamedCountText');
-      if (totalEl) totalEl.textContent = state.students.length;
-      if (namedEl) namedEl.textContent = namedCount;
-
-      const filtered = state.students.filter((s) => {
-        if (gFilter !== 'ALL' && String(s.grade) !== gFilter) return false;
-        if (cFilter !== 'ALL' && String(s.classNo) !== cFilter) return false;
-        if (searchQ) {
-          const hay = `${s.id} ${s.name || ''} ${s.grade}학년 ${s.classNo}반`.toLowerCase();
-          if (!hay.includes(searchQ)) return false;
-        }
-        return true;
-      });
-
-      tbody.innerHTML = filtered.map((s) => `
-        <tr class="hover:bg-slate-50">
-          <td class="py-2.5 px-4 font-black text-sky-700">${escapeHtml(s.id)}</td>
-          <td class="py-2.5 px-4 font-bold text-slate-700">${s.grade}학년 ${s.classNo}반 ${s.num}번</td>
-          <td class="py-2.5 px-4">
-            <div class="flex items-center gap-1.5">
-              <input type="text" id="stuNameInput-${s.id}" value="${escapeHtml(s.name || '')}" placeholder="미등록 (학생 또는 교사 입력)" class="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-extrabold w-36">
-              <button onclick="saveSingleStudentRow('${s.id}')" class="px-2.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-extrabold cursor-pointer">이름저장</button>
-            </div>
-          </td>
-          <td class="py-2.5 px-4 font-mono font-bold text-slate-600">${escapeHtml(s.pw)}</td>
-          <td class="py-2.5 px-4 text-right space-x-1 whitespace-nowrap">
-            <button onclick="resetSingleStudentPw('${s.id}')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold cursor-pointer">🔑 비번 1234 초기화</button>
-            <button onclick="clearSingleStudentSlot('${s.id}')" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 text-[11px] font-bold cursor-pointer">비우기(전출)</button>
-          </td>
-        </tr>
-      `).join('');
-    };
-
-    window.saveSingleStudentRow = async function(stuId) {
-      if (!state.isTeacher) return;
-      const inputEl = document.getElementById(`stuNameInput-${stuId}`);
-      if (!inputEl) return;
-      const stu = state.students.find(s => s.id === stuId);
-      if (!stu) return;
-      stu.name = inputEl.value.trim();
-      await saveRosterToCloud();
-      renderStudentAccountsTable();
-      showToast(`[${stuId}] 학생 이름이 '${stu.name || '미등록'}'(으)로 저장되었습니다.`);
-    };
-
-    window.resetSingleStudentPw = async function(stuId) {
-      if (!state.isTeacher) return;
-      const stu = state.students.find(s => s.id === stuId);
-      if (!stu) return;
-      stu.pw = '1234';
-      await saveRosterToCloud();
-      renderStudentAccountsTable();
-      showToast(`[${stuId} ${stu.name || ''}] 비밀번호가 1234로 초기화되었습니다.`);
-    };
-
-    window.clearSingleStudentSlot = async function(stuId) {
-      if (!state.isTeacher) return;
-      const stu = state.students.find(s => s.id === stuId);
-      if (!stu) return;
-      stu.name = '';
-      stu.pw = '1234';
-      await saveRosterToCloud();
-      renderStudentAccountsTable();
-      showToast(`[${stuId}] 계정이 초기 빈 슬롯으로 비워졌습니다.`);
-    };
-
-    window.resetAllStudentPasswords = async function() {
-      if (!state.isTeacher) return;
-      if (!confirm('전교생 180명 전체의 비밀번호를 초기값(1234)으로 일괄 초기화하시겠습니까? (등록된 학생 이름은 유지됩니다.)')) return;
-      state.students.forEach(s => { s.pw = '1234'; });
-      await saveRosterToCloud();
-      renderStudentAccountsTable();
-      showToast('전교생 180명의 비밀번호가 모두 1234로 초기화되었습니다!');
-    };
-
-    window.promoteAllGrades = async function() {
-      if (!state.isTeacher) return;
-      const ok = confirm('🎓 [새 학년 일괄 진급 실행 확인]\n\n• 기존 3학년(30101~30230)은 졸업 처리됩니다.\n• 기존 2학년 학생 정보는 3학년(30101~30230)으로 자동 진급합니다.\n• 기존 1학년 학생 정보는 2학년(20101~20230)으로 자동 진급합니다.\n• 1학년(10101~10230)은 신입생용 빈 슬롯(비번 1234)으로 초기화됩니다.\n\n진급을 실행하시겠습니까?');
-      if (!ok) return;
-
-      const oldMap = {};
-      state.students.forEach(s => { oldMap[s.id] = { ...s }; });
-
-      const nextList = createDefault180Students();
-      nextList.forEach(slot => {
-        if (slot.grade === 3) {
-          const fromId = `20${slot.classNo}${String(slot.num).padStart(2, '0')}`;
-          if (oldMap[fromId]) {
-            slot.name = oldMap[fromId].name || '';
-            slot.pw = oldMap[fromId].pw || '1234';
-          }
-        } else if (slot.grade === 2) {
-          const fromId = `10${slot.classNo}${String(slot.num).padStart(2, '0')}`;
-          if (oldMap[fromId]) {
-            slot.name = oldMap[fromId].name || '';
-            slot.pw = oldMap[fromId].pw || '1234';
-          }
-        }
-      });
-
-      state.students = nextList;
-      await saveRosterToCloud();
-      renderStudentAccountsTable();
-      showToast('🎓 새 학년 일괄 진급(1→2→3학년)이 완료되었습니다!');
-    };
-
-    // =========================================================================
-    // [탭 3 - 전체 공개] 📋 전체 일지 조회 및 엑셀 다운로드
-    // =========================================================================
-    function populateHistoryDogFilter() {
-      const sel = document.getElementById('historyDogFilter');
-      if (!sel) return;
-      const currentVal = sel.value || 'ALL';
-      let html = `<option value="ALL">모든 실습견 보기 (${state.dogs.length}두)</option>`;
-      state.dogs.forEach((dog) => {
-        html += `<option value="${dog.id}">${dog.no ? dog.no + '. ' : ''}${escapeHtml(dog.name)} (${escapeHtml(formatStudentsList(dog))})</option>`;
-      });
-      sel.innerHTML = html;
-      if (state.dogs.some(d => d.id === currentVal)) sel.value = currentVal;
-    }
-
-    window.renderHistoryTable = function() {
-      const tbody = document.getElementById('historyTableBody');
-      if (!tbody) return;
-      const dogFilter = document.getElementById('historyDogFilter')?.value || 'ALL';
-      const periodFilter = document.getElementById('historyPeriodFilter')?.value || 'ALL';
-      const healthFilter = document.getElementById('historyHealthFilter')?.value || 'ALL';
-
-      const sortedLogs = [...state.logs].sort((a, b) => b.date !== a.date ? b.date.localeCompare(a.date) : (b.submittedAt || '').localeCompare(a.submittedAt || ''));
-      const filtered = sortedLogs.filter((l) => {
-        if (dogFilter !== 'ALL' && l.dogId !== dogFilter) return false;
-        if (periodFilter !== 'ALL' && l.period !== periodFilter) return false;
-        if (healthFilter === 'ALERT' && !isLogAbnormal(l)) return false;
-        return true;
-      });
-
-      if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="py-10 text-center text-slate-400 font-bold">조건에 해당하는 일지 기록이 없습니다.</td></tr>`;
-        return;
-      }
-
-      tbody.innerHTML = filtered.map((l) => {
-        const dog = state.dogs.find((d) => d.id === l.dogId);
-        return `
-          <tr class="hover:bg-slate-50">
-            <td class="py-3.5 px-4 font-bold whitespace-nowrap">${escapeHtml(l.date)}<div class="text-xs font-extrabold mt-0.5">${getPeriodKorName(l.period)}</div></td>
-            <td class="py-3.5 px-4 font-extrabold">${escapeHtml(dog ? dog.name : l.dogId)}<div class="text-[11px] font-semibold text-slate-500">${escapeHtml(dog?.location || '')}</div></td>
-            <td class="py-3.5 px-4">${l.weight}kg / ${l.feedAmount}g (${escapeHtml(l.feedStatus)})</td>
-            <td class="py-3.5 px-4">${l.walkSkipped ? '산책생략' : `${l.walkMinutes}분 (${escapeHtml(l.walkStart)}~${escapeHtml(l.walkEnd)})`}</td>
-            <td class="py-3.5 px-4 text-xs">대변: ${escapeHtml(formatFecesDisplay(l))}<br>소변: ${escapeHtml(formatUrineDisplay(l))}</td>
-            <td class="py-3.5 px-4 text-xs">${escapeHtml((l.checkItems || []).join(', '))}${l.notes ? `<div class="mt-1 font-bold text-sky-900">💬 ${escapeHtml(l.notes)}</div>` : ''}</td>
-            <td class="py-3.5 px-4 font-extrabold">${escapeHtml(l.writer)} (${escapeHtml(l.submittedAt)})</td>
-            <td class="py-3.5 px-4 text-right"><button onclick="openLogDetailModal('${l.id}')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-sky-100 text-xs font-bold cursor-pointer">상세 보기</button></td>
-          </tr>
-        `;
-      }).join('');
-    };
-
-    window.openLogDetailModal = function(logId) {
-      const log = state.logs.find((l) => l.id === logId);
-      if (!log) return;
-      const dog = state.dogs.find((d) => d.id === log.dogId);
-      document.getElementById('modalLogPeriodBadge').textContent = getPeriodKorName(log.period);
-      document.getElementById('modalLogTitle').textContent = `${dog ? dog.name : ''} 일지 상세 (작성자: ${log.writer})`;
-      document.getElementById('modalLogBody').innerHTML = `
-        <div class="space-y-2 text-xs">
-          <div><strong>관리 일시:</strong> ${escapeHtml(log.date)} (${getPeriodKorName(log.period)}) · ${escapeHtml(log.submittedAt)} 제출</div>
-          <div><strong>몸무게 / 사료:</strong> ${log.weight}kg / ${log.feedAmount}g (${escapeHtml(log.feedStatus)})</div>
-          <div><strong>산책:</strong> ${log.walkSkipped ? '산책 생략/해당없음' : `${log.walkStart}~${log.walkEnd} (${log.walkMinutes}분)`}</div>
-          <div><strong>배변 / 배뇨:</strong> ${escapeHtml(formatFecesDisplay(log))} / ${escapeHtml(formatUrineDisplay(log))}</div>
-          <div><strong>처치 체크리스트:</strong> ${escapeHtml((log.checkItems || []).join(', '))}</div>
-          <div><strong>특이사항 메모:</strong> ${escapeHtml(log.notes || '없음')}</div>
-        </div>
-      `;
-
-      const delBtn = document.getElementById('modalDeleteLogBtn');
-      if (state.isTeacher) {
-        delBtn.classList.remove('hidden');
-        delBtn.onclick = async () => {
-          await removeLogRecord(log.id);
-          closeLogDetailModal();
-          showToast('해당 일지 기록이 삭제되었습니다.');
-        };
-      } else {
-        delBtn.classList.add('hidden');
-      }
-
-      document.getElementById('modalEditLogBtn').onclick = () => {
-        closeLogDetailModal();
-        jumpToWriteLog(log.date, log.period, log.dogId);
-      };
-      document.getElementById('logDetailModal').classList.remove('hidden');
-    };
-
-    window.closeLogDetailModal = function() { document.getElementById('logDetailModal').classList.add('hidden'); };
-
-    window.exportLogsToCSV = function() {
-      const headers = ['일자', '관리구분', '연번', '실습견명', '품종', '구분', '작성학생', '제출시각', '몸무게(kg)', '사료급여량(g)', '섭취상태', '산책시작', '산책종료', '산책시간(분)', '배변상태', '배변기타상세', '배뇨상태', '배뇨기타상세', '실시처치항목', '특이사항메모'];
-      const rows = state.logs.map((l) => {
-        const dog = state.dogs.find((d) => d.id === l.dogId) || {};
-        return [
-          l.date, getPeriodKorName(l.period), dog.no || '', dog.name || l.dogId, dog.breed || '', dog.location || '',
-          l.writer, l.submittedAt, l.weight, l.feedAmount, l.feedStatus,
-          l.walkSkipped ? '생략' : l.walkStart, l.walkSkipped ? '생략' : l.walkEnd, l.walkMinutes,
-          l.feces, l.fecesCustom || '', l.urine, l.urineCustom || '',
-          (l.checkItems || []).join(' / '), (l.notes || '').replace(/\n/g, ' ')
-        ].map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',');
-      });
-      const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `한국펫고_실습견관리일지_${state.monitorDate}.csv`;
-      link.click();
-      URL.revokeObjectURL(url);
-      showToast('전체 일지 엑셀(CSV) 파일이 다운로드되었습니다.');
-    };
-
-    // 초기 실행
-    window.addEventListener('DOMContentLoaded', () => {
-      const numSel = document.getElementById('quickLoginNum');
-      if (numSel) {
-        let opts = '<option value="">번호 선택</option>';
-        for (let i = 1; i <= 30; i++) opts += `<option value="${i}">${i}번</option>`;
-        numSel.innerHTML = opts;
-      }
-
-      if (document.documentElement.classList.contains('dark')) {
-        const mIcon = document.getElementById('mobileThemeIcon');
-        const dIcon = document.getElementById('desktopThemeIcon');
-        const dText = document.getElementById('desktopThemeText');
-        if (mIcon) mIcon.textContent = '☀️';
-        if (dIcon) dIcon.textContent = '☀️';
-        if (dText) dText.textContent = '라이트모드';
-      }
-
-      document.getElementById('formDateInput').value = TODAY_STR;
-      document.getElementById('monitorDateInput').value = TODAY_STR;
-      document.getElementById('medDateInput').value = TODAY_STR;
-
-      try {
-        const saved = localStorage.getItem('kp_saved_session');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && parsed.id) {
-            state.loggedInUser = parsed;
-            state.isTeacher = parsed.role === 'teacher';
-            document.getElementById('loginGateOverlay').classList.add('hidden');
-          }
-        }
-      } catch (e) {}
-
-      refreshAllViews();
-      handleFormDogOrSlotChange();
-      initCloudSync();
-    });
-  </script>
-</body>
-</html>
